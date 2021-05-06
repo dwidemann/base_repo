@@ -3,11 +3,16 @@ import argparse
 from parse_config import ConfigParser
 import collections
 import pprint
+from data_classes import dataset_classes 
 
 def main(config):
     logger = config.get_logger('trainer', config['trainer']['verbosity'])
     # print logged informations to the screen
     pprint.pprint(config.config)
+
+    dataLoader = config.init_obj('data_loader', dataset_classes)
+    X,y = next(iter(dataLoader))
+    print(X.shape)
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser(description='PyTorch Template')

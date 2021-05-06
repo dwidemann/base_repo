@@ -7,7 +7,7 @@
         "args": {}
     },
     "data_loader": {
-        "type": "MnistDataLoader",
+        "type": "FashionMnistDataLoader",
         "args":{
             "data_dir": "/Users/data",
             "batch_size": 128,
