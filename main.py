@@ -5,6 +5,13 @@ import collections
 import pprint
 from datasets import dataset_classes 
 import models.model as model_classes
+from utils import prepare_device
+from utils import losses
+from utils import metrics as Metrics
+from utils import inf_loop, MetricTracker
+import torch
+from logger import TensorboardWriter
+from utils.train_eval_fcns import train_epoch
 
 def main(config):
     logger = config.get_logger('trainer', config['trainer']['verbosity'])
@@ -16,7 +23,38 @@ def main(config):
     print(X.shape)
 
     model = config.init_obj('arch', model_classes)
-    print(model)
+    logger.info(model)
+
+    # prepare for (multi-device) GPU training
+    device, device_ids = prepare_device(config['n_gpu'])
+    model = model.to(device)
+    if len(device_ids) > 1:
+        model = torch.nn.DataParallel(model, device_ids=device_ids)
+    logger.info(device)
+    logger.info(device_ids)
+
+    # get function handles of loss and metrics
+    criterion = getattr(losses, config['loss'])
+    logger.info(criterion)
+    metrics = [getattr(Metrics, met) for met in config['metrics']]
+    logger.info(metrics)
+
+    # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
+    trainable_params = filter(lambda p: p.requires_grad, model.parameters())
+    optimizer = config.init_obj('optimizer', torch.optim, trainable_params)
+    logger.info(optimizer)
+    lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
+    logger.info(lr_scheduler)
+
+    cfg_trainer = config['trainer']
+    train_writer = TensorboardWriter(config.log_dir, logger, config['visualization']['tensorboardX'])
+    train_metrics = MetricTracker('loss', *[m.__name__ for m in metrics], writer=train_writer)
+
+    for idx in range(1,cfg_trainer['epochs']+1):
+        log = train_epoch(model, dataLoader, device, optimizer, lr_scheduler, logger, 
+                        train_metrics, criterion, idx, train_writer, metrics)
+        logger.info(log)
+
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser(description='PyTorch Template')
