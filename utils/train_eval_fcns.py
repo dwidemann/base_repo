@@ -2,21 +2,23 @@ import torch
 from numpy import inf
 from torchvision.utils import make_grid
 
+
+def _progress(batch_idx,dataLoader):
+    base = '[{}/{} ({:.0f}%)]'
+    len_epoch = len(dataLoader)
+    if hasattr(dataLoader, 'n_samples'):
+        current = batch_idx * dataLoader.batch_size
+        total = dataLoader.n_samples
+    else:
+        current = batch_idx
+        total = len_epoch
+        return base.format(current, total, 100.0 * current / total)
+
 def train_epoch(model, dataLoader, device, optimizer, lr_scheduler, logger, train_metrics, criterion, epoch, writer, metric_ftns):
     model.train()
     train_metrics.reset()
     len_epoch = len(dataLoader)
     log_step = 10 #int(len(dataLoader)//10 + 1)
-
-    def _progress(batch_idx):
-        base = '[{}/{} ({:.0f}%)]'
-        if hasattr(dataLoader, 'n_samples'):
-            current = batch_idx * dataLoader.batch_size
-            total = dataLoader.n_samples
-        else:
-            current = batch_idx
-            total = len_epoch
-        return base.format(current, total, 100.0 * current / total)
 
     for batch_idx, (data, target) in enumerate(dataLoader):
         data, target = data.to(device), target.to(device)
@@ -35,7 +37,7 @@ def train_epoch(model, dataLoader, device, optimizer, lr_scheduler, logger, trai
         if batch_idx % log_step == 0:
             logger.debug('Train Epoch: {} {} Loss: {:.6f}'.format(
                 epoch,
-                _progress(batch_idx),
+                _progress(batch_idx,dataLoader),
                 loss.item()))
             writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
 
@@ -47,6 +49,36 @@ def train_epoch(model, dataLoader, device, optimizer, lr_scheduler, logger, trai
         lr_scheduler.step()
     return log
 
+def validation_epoch(model, dataLoader, device, logger, val_metrics, criterion, epoch, writer, metric_ftns):
+    model.eval()
+    val_metrics.reset()
+    len_epoch = len(dataLoader)
+
+    for batch_idx, (data, target) in enumerate(dataLoader):
+        data, target = data.to(device), target.to(device)
+        output = model(data)
+        loss = criterion(output, target)
+        writer.set_step((epoch - 1) * len_epoch + batch_idx)
+        val_metrics.update('loss', loss.item())
+        for met in metric_ftns:
+            val_metrics.update(met.__name__, met(output, target))
+        if batch_idx == len_epoch:
+            break
+        
+    writer.set_step((epoch - 1) * len_epoch + batch_idx)
+    val_metrics.update('loss', loss.item())
+        # for met in metric_ftns:
+        #     val_metrics.update(met.__name__, met(output, target))
+
+    logger.debug('Validation Epoch: {} {} Loss: {:.6f}'.format(
+            epoch,
+            _progress(batch_idx, dataLoader),
+            loss.item()))
+    writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+
+    log = val_metrics.result()
+
+    return log
 
 '''
 def train_epoch(model, criterion, metric_ftns, optimizer, config, epoch):

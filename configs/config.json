@@ -12,7 +12,8 @@
             "data_dir": "/Users/data",
             "batch_size": 128,
             "shuffle": true,
-            "num_workers": 2
+            "num_workers": 2,
+            "training": true
         }
     },
     "optimizer": {

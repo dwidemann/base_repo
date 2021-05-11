@@ -11,16 +11,21 @@ from utils import metrics as Metrics
 from utils import inf_loop, MetricTracker
 import torch
 from logger import TensorboardWriter
-from utils.train_eval_fcns import train_epoch
+from utils.train_eval_fcns import train_epoch, validation_epoch
+from copy import deepcopy
 
 def main(config):
     logger = config.get_logger('trainer', config['trainer']['verbosity'])
     # print logged informations to the screen
     pprint.pprint(config.config)
 
-    dataLoader = config.init_obj('data_loader', dataset_classes)
-    X,y = next(iter(dataLoader))
+    trainDataLoader = config.init_obj('data_loader', dataset_classes)
+    X,y = next(iter(trainDataLoader))
     print(X.shape)
+
+    config_test = deepcopy(config)
+    config_test.config['data_loader']['training'] = False
+    valDataLoader = config_test.init_obj('data_loader', dataset_classes)
 
     model = config.init_obj('arch', model_classes)
     logger.info(model)
@@ -50,10 +55,17 @@ def main(config):
     train_writer = TensorboardWriter(config.log_dir, logger, config['visualization']['tensorboardX'])
     train_metrics = MetricTracker('loss', *[m.__name__ for m in metrics], writer=train_writer)
 
+    val_writer = TensorboardWriter(config.log_dir, logger, config['visualization']['tensorboardX'])
+    val_metrics = MetricTracker('loss', *[m.__name__ for m in metrics], writer=train_writer)
+
     for idx in range(1,cfg_trainer['epochs']+1):
-        log = train_epoch(model, dataLoader, device, optimizer, lr_scheduler, logger, 
+        log = train_epoch(model, trainDataLoader, device, optimizer, lr_scheduler, logger, 
                         train_metrics, criterion, idx, train_writer, metrics)
         logger.info(log)
+
+        val_log = validation_epoch(model, valDataLoader, device, logger, val_metrics,
+                                criterion, idx, val_writer, metrics)
+        logger.info(val_log)
 
 
 if __name__ == '__main__':

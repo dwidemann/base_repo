@@ -12,7 +12,8 @@
             "data_dir": "/Users/data",
             "batch_size": 128,
             "shuffle": true,
-            "num_workers": 2
+            "num_workers": 2,
+            "training": true
         }
     },
     "optimizer": {
@@ -25,7 +26,7 @@
     },
     "loss": "nll_loss",
     "metrics": [
-        "my_metric", "my_metric2"
+        "accuracy", "top_k_acc"
     ],
     "lr_scheduler": {
         "type":"StepLR",
@@ -35,7 +36,7 @@
         }
     },
     "trainer": {
-        "epochs": 1,
+        "epochs": 50,
         "save_dir": "experiments/",
         "save_freq": 1,
         "verbosity": 2,
